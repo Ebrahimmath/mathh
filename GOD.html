@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <title>تمرین بازنمایی زوج مرتب – جشن و بادکنک بزرگ</title>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <style>
+    body { margin:0; padding:0; font-family: sans-serif; text-align: center; }
+    #startScreen, #gameScreen, #nextScreen { padding: 10px; }
+    canvas { border:1px solid #333; display:block; margin: 10px auto; }
+    #vennDiagram, #venn2 { width:800px; height:300px; }
+    #grid { width:800px; height:800px; margin-top:20px; }
+    button { font-size:24px; padding:10px 20px; margin:10px; }
+    input { font-size:20px; width:80px; margin:5px; }
+    #startScreen input { width:160px; }
+    #msg2 { font-weight:bold; color:red; margin-top:10px; font-size:24px; }
+    #overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7);
+      display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden;
+      transition: opacity .5s; z-index: 100; flex-direction: column; color: white; padding: 20px; }
+    #overlay.show { opacity:1; visibility:visible; }
+    #overlay .balloons { position: absolute; left: 0; right: 0; display: flex;
+      justify-content: space-around; pointer-events: none; font-size: 6rem; line-height: 1; }
+    #overlay .balloons.top { top: 10px; }
+    #overlay .balloons.bottom { bottom: 10px; transform: rotate(180deg); }
+    #overlay #congrats { font-size: 6rem; margin-bottom: 0.5rem; }
+    #overlay #info { font-size: 3rem; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div id="startScreen">
+    <h1>تمرین بازنمایی‌های زوج مرتبی و نمودار مختصاتی</h1>
+    <input id="studentName" type="text" placeholder="نام و نام خانوادگی"><br>
+    <input id="studentGrade" type="text" placeholder="پایه تحصیلی"><br>
+    <input id="lessonName" type="text" placeholder="نام درس"><br>
+    <button id="startBtn">شروع تمرین</button>
+  </div>
+  <div id="gameScreen" style="display:none;">
+    <h2>سوال ۱</h2>
+    <canvas id="vennDiagram" width="800" height="300"></canvas>
+    <p style="font-size:36px;">بازنمایی نمودار مختصاتی، این رابطه را رسم کنید</p>
+    <canvas id="grid" width="800" height="800"></canvas>
+    <button id="nextBtn">سوال بعدی</button>
+  </div>
+  <div id="nextScreen" style="display:none;">
+    <h2>سوال ۲</h2>
+    <canvas id="venn2" width="800" height="300"></canvas>
+    <p style="font-size:24px;">بازنمایی زوج مرتب این رابطه را کامل کنید:</p>
+    <form id="pairForm"></form>
+    <button id="finishBtn">پایان</button>
+    <div id="msg2"></div>
+  </div>
+  <div id="overlay">
+    <div class="balloons top"></div>
+    <div class="balloons bottom"></div>
+    <canvas id="confettiCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+    <div id="congrats">🎉🎉🎉</div>
+    <div id="info"></div>
+  </div>
+  <script>
+    let studentName, studentGrade, lessonName;
+    let setA = [], setB = [], rel1 = [], rel2 = [];
+    const colors = ['#e41a1c','#377eb8','#4daf4a'];
+    const venn = document.getElementById('vennDiagram');
+    const venn2 = document.getElementById('venn2');
+    const grid = document.getElementById('grid');
+    const ctxGrid = grid.getContext('2d');
+    const gridSize = grid.width, center = gridSize/2, step = gridSize/12;
+    const confCanvas = document.getElementById('confettiCanvas');
+    confCanvas.width = window.innerWidth;
+    confCanvas.height = window.innerHeight;
+    const confettiInstance = confetti.create(confCanvas, { resize: true, useWorker: true });
+    let confettiInterval;
+
+    document.getElementById('startBtn').onclick = () => {
+      studentName = document.getElementById('studentName').value.trim();
+      studentGrade = document.getElementById('studentGrade').value.trim();
+      lessonName = document.getElementById('lessonName').value.trim();
+      if (!studentName || !studentGrade || !lessonName) {
+        alert('لطفاً اطلاعات را کامل کنید');
+        return;
+      }
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      initStage1();
+    };
+
+    function genSets() { setA=[];setB=[];while(setA.length<3){let v=Math.floor(Math.random()*11)-5;if(!setA.includes(v))setA.push(v);}while(setB.length<3){let v=Math.floor(Math.random()*11)-5;if(!setB.includes(v))setB.push(v);} }
+    function genRel1() { rel1=[];let counts={};setA.forEach(a=>counts[a]=0);if(Math.random()<0.5)counts[setA[Math.floor(Math.random()*setA.length)]]=2;setA.filter(a=>counts[a]===0).forEach(a=>counts[a]=Math.random()<0.5?1:0);if(Object.values(counts).reduce((s,c)=>s+c,0)<1)counts[setA[Math.floor(Math.random()*setA.length)]]=1;setA.forEach(a=>{let bs=[...setB];for(let i=0;i<counts[a];i++)rel1.push({a,b:bs.splice(Math.floor(Math.random()*bs.length),1)[0]});});}
+    function genRel2(sets,rel){rel.length=0;let order=[...sets].sort(()=>0.5-Math.random());let counts={[order[0]]:2,[order[1]]:1,[order[2]]:1};sets.forEach(a=>{let bs=[...(sets===setA?setB:setA)];for(let i=0;i<counts[a];i++)rel.push({a,b:bs.splice(Math.floor(Math.random()*bs.length),1)[0]});});}
+    function drawVenn(c,setsA,setsB,rels){const v=c.getContext('2d');v.clearRect(0,0,800,300);const r=100,A={x:200,y:150},B={x:600,y:150};v.strokeStyle='#333';v.lineWidth=2;v.font='24px sans-serif';v.beginPath();v.arc(A.x,A.y,r,0,2*Math.PI);v.stroke();v.beginPath();v.arc(B.x,B.y,r,0,2*Math.PI);v.stroke();v.fillText('A',A.x,A.y-r-20);v.fillText('B',B.x,B.y-r-20);setsA.forEach((val,i)=>v.fillText(val,A.x,A.y-r+40+i*80));setsB.forEach((val,i)=>v.fillText(val,B.x,B.y-r+40+i*80));rels.forEach(item=>{let iA=setsA.indexOf(item.a),iB=setsB.indexOf(item.b);let yA=A.y-r+40+iA*80,yB=B.y-r+40+iB*80;v.strokeStyle=colors[iA];v.fillStyle=colors[iA];v.beginPath();v.moveTo(A.x,yA);v.lineTo(B.x,yB);v.stroke();let ang=Math.atan2(yB-yA,B.x-A.x);v.beginPath();v.moveTo(B.x,yB);v.lineTo(B.x-10*Math.cos(ang-Math.PI/6),yB-10*Math.sin(ang-Math.PI/6));v.lineTo(B.x-10*Math.cos(ang+Math.PI/6),yB-10*Math.sin(ang+Math.PI/6));v.fill();});}
+    function drawGrid(){ctxGrid.clearRect(0,0,gridSize,gridSize);ctxGrid.strokeStyle='#ddd';for(let i=-6;i<=6;i++){let x=center+i*step;ctxGrid.beginPath();ctxGrid.moveTo(x,0);ctxGrid.lineTo(x,gridSize);ctxGrid.stroke();let y=center+i*step;ctxGrid.beginPath();ctxGrid.moveTo(0,y);ctxGrid.lineTo(gridSize,y);ctxGrid.stroke();}ctxGrid.lineWidth=2;ctxGrid.strokeStyle='black';ctxGrid.beginPath();ctxGrid.moveTo(0,center);ctxGrid.lineTo(gridSize,center);ctxGrid.stroke();ctxGrid.beginPath();ctxGrid.moveTo(center,0);ctxGrid.lineTo(center,gridSize);ctxGrid.stroke();}
+    function initStage1(){genSets();genRel1();drawVenn(venn,setA,setB,rel1);drawGrid();grid.addEventListener('click',click1);}
+    function click1(e){let rect=grid.getBoundingClientRect();let gx=Math.round((e.clientX-rect.left-center)/step);let gy=Math.round((center-(e.clientY-rect.top))/step);let idx=rel1.findIndex(r=>r.a===gx&&r.b===gy);if(idx<0)return;ctxGrid.fillStyle='green';ctxGrid.beginPath();ctxGrid.arc(center+gx*step,center-gy*step,15,0,2*Math.PI);ctxGrid.fill();rel1.splice(idx,1);}
+    document.getElementById('nextBtn').onclick=()=>{if(rel1.length>0){alert('لطفاً همهٔ نقاط رابطه را در نمودار مختصاتی علامت بزنید');return;}document.getElementById('gameScreen').style.display='none';document.getElementById('nextScreen').style.display='block';genSets();genRel2(setA,rel2);drawVenn(venn2,setA,setB,rel2);const form=document.getElementById('pairForm');form.innerHTML='';rel2.forEach((r,i)=>form.innerHTML+=`(<input name="a${i}"/>,<input name="b${i}"/>)<br>`);document.getElementById('msg2').innerText='';};
+    document.getElementById('finishBtn').onclick=()=>{
+      const inputs=document.querySelectorAll('#pairForm input');
+      const userPairs=[];
+      for(let i=0;i<rel2.length;i++){
+        userPairs.push({a:inputs[2*i].value.trim(),b:inputs[2*i+1].value.trim()});
+      }
+      let allCorrect=rel2.every(r=>userPairs.some(up=>up.a===String(r.a)&&up.b===String(r.b)));
+      if(!allCorrect){
+        document.getElementById('msg2').innerText='جواب‌های وارد شده صحیح نیستند، دوباره بررسی کنید';
+        return;
+      }
+      document.getElementById('nextScreen').style.display='none';
+      const topB=document.querySelector('#overlay .balloons.top'),
+            bottomB=document.querySelector('#overlay .balloons.bottom');
+      topB.innerHTML='';bottomB.innerHTML='';
+      const balloonSize=parseFloat(getComputedStyle(topB).fontSize),
+            count=Math.ceil(window.innerWidth/balloonSize);
+      for(let i=0;i<count;i++){topB.innerHTML+='<span>🎈</span>';bottomB.innerHTML+='<span>🎈</span>';}
+      document.getElementById('overlay').classList.add('show');
+      document.getElementById('info').innerHTML=
+        `تبریک به ${studentName} زبل👏🏼<br>`+
+        `از پایهٔ ${studentGrade} 📚<br>`+
+        `که به بهترین شکل، تمرین درس «${lessonName}» را انجام دادی🥇<br>`+
+        `عکس از این صفحه رو به استادت در شاد ارسال کن 💯`;
+      if(!confettiInterval){
+        confettiInterval=setInterval(()=>{confettiInstance({particleCount:30,spread:70,origin:{x:Math.random(),y:0}});confettiInstance({particleCount:30,spread:70,origin:{x:Math.random(),y:1}});},500);
+      }
+    };
+  </script>
+</body>
+</html>
